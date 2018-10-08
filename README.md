@@ -1,5 +1,7 @@
 ### 喵窝
 
+这是目前运行在 miaowo.org 的分支
+
 ## 截图
 
 ![喵窝网页截图](screenshot.png)
