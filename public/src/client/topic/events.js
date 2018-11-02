@@ -225,6 +225,9 @@ define('forum/topic/events', [
 
 	function togglePostVote(data) {
 		var post = $('[data-pid="' + data.post.pid + '"]');
+		post.find('[component="post/upvote"]').toggleClass('hidden');
+		post.find('[component="post/upvoted"]').toggleClass('hidden');
+
 		post.find('[component="post/upvote"]').filter(function (index, el) {
 			return parseInt($(el).closest('[data-pid]').attr('data-pid'), 10) === parseInt(data.post.pid, 10);
 		}).toggleClass('upvoted', data.upvote);
