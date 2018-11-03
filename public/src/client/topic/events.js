@@ -230,10 +230,10 @@ define('forum/topic/events', [
 
 		post.find('[component="post/upvote"]').filter(function (index, el) {
 			return parseInt($(el).closest('[data-pid]').attr('data-pid'), 10) === parseInt(data.post.pid, 10);
-		}).toggleClass('upvoted', data.upvote);
+		});
 		post.find('[component="post/downvote"]').filter(function (index, el) {
 			return parseInt($(el).closest('[data-pid]').attr('data-pid'), 10) === parseInt(data.post.pid, 10);
-		}).toggleClass('downvoted', data.downvote);
+		});
 	}
 
 	function onNewNotification(data) {
