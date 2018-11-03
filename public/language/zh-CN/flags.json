@@ -52,7 +52,7 @@
 	"note-added": "备注已添加",
 
 	"modal-title": "举报不适内容",
-	"modal-body": "请选择或者输入您举报 %1%2 的原因以便版主进行审核。",
+	"modal-body": "请选择或者输入举报此内容的原因以便风纪组进行审核。",
 	"modal-reason-spam": "垃圾信息",
 	"modal-reason-offensive": "人身攻击",
 	"modal-reason-other": "其他（请在下方指定）",
