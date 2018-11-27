@@ -34,7 +34,7 @@ module.exports = function (User) {
 					lastonline: timestamp,
 					picture: data.picture || '',
 					fullname: data.fullname || '',
-				        // location: data.location || '',
+				  // location: data.location || '',
 					// birthday: data.birthday || '',
 					website: '',
 					signature: '',
