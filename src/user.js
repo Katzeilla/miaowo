@@ -361,7 +361,7 @@ User.addInterstitials = function (callback) {
 							digestEnabled: meta.config.dailyDigestFreq !== 'off',
 						},
 						callback: function (userData, formData, next) {
-							if (formData.gdpr_agree_data === 'on' && formData.gdpr_agree_email === 'on') {
+							if (formData.gdpr_agree_data === 'on' && formData.read_docs === 'on') {
 								userData.gdpr_consent = true;
 							}
 
