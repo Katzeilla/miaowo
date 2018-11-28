@@ -20,7 +20,7 @@
 	
 	<div class="checkbox">
 		<label>
-			<input type="checkbox" name="gdrp_agree_data" id="gdpr_agree_data"> <strong>我许可此站点收集与处理我的个人信息</strong>
+			<input type="checkbox" name="gdpr_agree_data" id="gdpr_agree_data"> <strong>我许可此站点收集与处理我的个人信息</strong>
 		</label>
 	</div>
 </div>
