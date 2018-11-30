@@ -22,5 +22,5 @@
     "interstitial.errors-found": "我们无法完成您的注册：",
     "gdpr_agree_data": "我同意此网站对我个人信息的收集与处理。",
     "gdpr_agree_email": "我同意此网站向我发送摘要和通知邮件。",
-    "gdpr_consent_denied": "你需要先阅读文档并许可此站点收集与处理你的个人信息。"
+    "gdpr_consent_denied": "你需要先阅读文档并许可此站点收集并处理你的个人信息。"
 }
