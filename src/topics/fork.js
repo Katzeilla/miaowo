@@ -149,7 +149,17 @@ module.exports = function (Topics) {
 				}
 				if (!topicData[1].pinned) {
 					tasks.push(async.apply(db.sortedSetIncrBy, 'cid:' + topicData[1].cid + ':tids:posts', 1, toTid));
+<<<<<<< Updated upstream
 				}
+||||||| merged common ancestors
+				} 
+=======
+<<<<<<< HEAD
+				} 
+=======
+				}
+>>>>>>> upstream/v1.12.x
+>>>>>>> Stashed changes
 				async.series(tasks, function (err) {
 					next(err);
 				});

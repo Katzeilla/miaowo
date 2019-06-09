@@ -2,7 +2,11 @@
     "name": "nodebb",
     "license": "GPL-3.0",
     "description": "NodeBB Forum",
+<<<<<<< HEAD
+    "version": "1.10.2",
+=======
     "version": "1.12.2",
+>>>>>>> upstream/v1.12.x
     "homepage": "http://www.nodebb.org",
     "repository": {
         "type": "git",

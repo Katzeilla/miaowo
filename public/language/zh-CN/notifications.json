@@ -5,11 +5,26 @@
     "mark_all_read": "标记全部为已读",
     "back_to_home": "返回 %1",
     "outgoing_link": "站外链接",
-    "outgoing_link_message": "您正在离开 %1",
+    "outgoing_link_message": "你正在离开 %1",
     "continue_to": "继续前往 %1",
     "return_to": "返回 %1",
+<<<<<<< Updated upstream
     "new_notification": "您有一个新的通知",
     "you_have_unread_notifications": "您有未读的通知。",
+||||||| merged common ancestors
+    "new_notification": "新通知",
+    "new_notification_from": "你有一条来自 %1 的新通知",
+    "you_have_unread_notifications": "你有未读的通知。",
+=======
+<<<<<<< HEAD
+    "new_notification": "新通知",
+    "new_notification_from": "你有一条来自 %1 的新通知",
+    "you_have_unread_notifications": "你有未读的通知。",
+=======
+    "new_notification": "您有一个新的通知",
+    "you_have_unread_notifications": "您有未读的通知。",
+>>>>>>> upstream/v1.12.x
+>>>>>>> Stashed changes
     "all": "所有",
     "topics": "主题",
     "replies": "回复",
