@@ -90,7 +90,7 @@ Flags.get = function (flagId, callback) {
 			// Second stage
 			async.parallel({
 				userObj: async.apply(user.getUserFields, data.base.uid, ['username', 'userslug', 'picture', 'reputation']),
-				targetObj: async.apply(Flags.getTarget, data.base.type, data.base.targetId, data.base.uid),
+				targetObj: async.apply(Flags.getTarget, data.base.type, data.base.targetId, 0),
 			}, function (err, payload) {
 				// Final object return construction
 				next(err, Object.assign(data.base, {
@@ -236,7 +236,6 @@ Flags.list = function (filters, uid, callback) {
 
 Flags.validate = function (payload, callback) {
 	async.parallel({
-		targetExists: async.apply(Flags.targetExists, payload.type, payload.id),
 		target: async.apply(Flags.getTarget, payload.type, payload.id, payload.uid),
 		reporter: async.apply(user.getUserData, payload.uid),
 	}, function (err, data) {
@@ -244,9 +243,13 @@ Flags.validate = function (payload, callback) {
 			return callback(err);
 		}
 
-		if (data.target.deleted) {
+		if (!data.target) {
+			return callback(new Error('[[error:invalid-data]]'));
+		} else if (data.target.deleted) {
 			return callback(new Error('[[error:post-deleted]]'));
-		} else if (parseInt(data.reporter.banned, 10)) {
+		} else if (!data.reporter || !data.reporter.userslug) {
+			return callback(new Error('[[error:no-user]]'));
+		} else if (data.reporter.banned) {
 			return callback(new Error('[[error:user-banned]]'));
 		}
 
@@ -257,9 +260,8 @@ Flags.validate = function (payload, callback) {
 					return callback(err);
 				}
 
-				var minimumReputation = utils.isNumber(meta.config['min:rep:flag']) ? parseInt(meta.config['min:rep:flag'], 10) : 0;
 				// Check if reporter meets rep threshold (or can edit the target post, in which case threshold does not apply)
-				if (!editable.flag && parseInt(data.reporter.reputation, 10) < minimumReputation) {
+				if (!editable.flag && data.reporter.reputation < meta.config['min:rep:flag']) {
 					return callback(new Error('[[error:not-enough-reputation-to-flag]]'));
 				}
 
@@ -273,9 +275,8 @@ Flags.validate = function (payload, callback) {
 					return callback(err);
 				}
 
-				var minimumReputation = utils.isNumber(meta.config['min:rep:flag']) ? parseInt(meta.config['min:rep:flag'], 10) : 0;
 				// Check if reporter meets rep threshold (or can edit the target user, in which case threshold does not apply)
-				if (!editable && parseInt(data.reporter.reputation, 10) < minimumReputation) {
+				if (!editable && data.reporter.reputation < meta.config['min:rep:flag']) {
 					return callback(new Error('[[error:not-enough-reputation-to-flag]]'));
 				}
 
@@ -424,13 +425,18 @@ Flags.getTarget = function (type, id, uid, callback) {
 				switch (type) {
 				case 'post':
 					async.waterfall([
-						async.apply(posts.getPostsByPids, [id], uid),
-						function (posts, next) {
-							topics.addPostData(posts, uid, next);
+						async.apply(posts.getPostsData, [id]),
+						function (postData, next) {
+							async.map(postData, posts.parsePost, next);
 						},
-					], function (err, posts) {
-						next(err, posts[0]);
-					});
+						function (postData, next) {
+							postData = postData.filter(Boolean);
+							topics.addPostData(postData, uid, next);
+						},
+						function (postData, next) {
+							next(null, postData[0]);
+						},
+					], callback);
 					break;
 
 				case 'user':

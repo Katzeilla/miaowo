@@ -51,12 +51,22 @@
     "notification_only": "用通知提醒我",
     "email_only": "用邮件提醒我",
     "notification_and_email": "同时使用 通知 和 邮件 提醒我",
+<<<<<<< HEAD
     "notificationType_upvote": "当有人赞了我时",
     "notificationType_new-topic": "当有人回复我的主题时",
     "notificationType_new-reply": "当你正在查看的主题中有新回复时",
     "notificationType_follow": "当有人关注我时",
     "notificationType_new-chat": "当我收到聊天消息时",
     "notificationType_group-invite": "当我收到群组邀请时",
+=======
+    "notificationType_upvote": "当有人顶了我的帖子时",
+    "notificationType_new-topic": "当有人回复我的帖子时",
+    "notificationType_new-reply": "当您正在查看的主题中有新回复时",
+    "notificationType_follow": "当有人关注您时",
+    "notificationType_new-chat": "当您收到聊天消息时",
+    "notificationType_group-invite": "当您收到群组邀请时",
+    "notificationType_group-request-membership": "When someone requests to join a group you own",
+>>>>>>> upstream/v1.11.x
     "notificationType_new-register": "当有人被添加到申请队列时",
     "notificationType_post-queue": "当有新帖子等待审核时",
     "notificationType_new-post-flag": "当有新的帖子举报时",

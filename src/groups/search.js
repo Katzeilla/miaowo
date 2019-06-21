@@ -13,22 +13,25 @@ module.exports = function (Groups) {
 		}
 		query = query.toLowerCase();
 		async.waterfall([
-			async.apply(db.getObjectValues, 'groupslug:groupname'),
+			async.apply(db.getSortedSetRange, 'groups:createtime', 0, -1),
 			function (groupNames, next) {
-				// Ephemeral groups and the registered-users groups are searchable
-				groupNames = Groups.ephemeralGroups.concat(groupNames).concat('registered-users');
+				if (!options.hideEphemeralGroups) {
+					groupNames = Groups.ephemeralGroups.concat(groupNames);
+				}
 				groupNames = groupNames.filter(function (name) {
-					return name.toLowerCase().indexOf(query) !== -1 && name !== 'administrators' && !Groups.isPrivilegeGroup(name);
+					return name.toLowerCase().includes(query) && name !== 'administrators' && !Groups.isPrivilegeGroup(name);
 				});
 				groupNames = groupNames.slice(0, 100);
-				Groups.getGroupsData(groupNames, next);
+				if (options.showMembers) {
+					Groups.getGroupsAndMembers(groupNames, next);
+				} else {
+					Groups.getGroupsData(groupNames, next);
+				}
 			},
 			function (groupsData, next) {
 				groupsData = groupsData.filter(Boolean);
 				if (options.filterHidden) {
-					groupsData = groupsData.filter(function (group) {
-						return !group.hidden;
-					});
+					groupsData = groupsData.filter(group => !group.hidden);
 				}
 
 				Groups.sort(options.sort, groupsData, next);

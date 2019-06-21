@@ -1,27 +1,22 @@
 'use strict';
 
 
-define('forum/unread', ['forum/recent', 'topicSelect', 'forum/infinitescroll', 'components'], function (recent, topicSelect, infinitescroll, components) {
+define('forum/unread', ['topicSelect', 'components', 'topicList'], function (topicSelect, components, topicList) {
 	var Unread = {};
 
-	$(window).on('action:ajaxify.start', function (ev, data) {
-		if (ajaxify.currentPage !== data.url) {
-			recent.removeListeners();
-		}
-	});
+	var watchStates = {
+		ignoring: 1,
+		notwatching: 2,
+		watching: 3,
+	};
 
 	Unread.init = function () {
 		app.enterRoom('unread_topics');
 
-		$('#new-topics-alert').on('click', function () {
-			$(this).addClass('hide');
-		});
+		topicList.init('unread');
+		topicSelect.init();
 
-		recent.watchForNewPosts();
-
-		recent.handleCategorySelection();
-
-		$(window).trigger('action:topics.loaded', { topics: ajaxify.data.topics });
+		updateUnreadTopicCount('/' + ajaxify.data.selectedFilter.url, ajaxify.data.topicCount);
 
 		$('#markSelectedRead').on('click', function () {
 			var tids = topicSelect.getSelectedTids();
@@ -71,41 +66,6 @@ define('forum/unread', ['forum/recent', 'topicSelect', 'forum/infinitescroll', '
 				doneRemovingTids(tids);
 			});
 		});
-
-		topicSelect.init();
-
-		if ($('body').height() <= $(window).height() && $('[component="category"]').children().length >= 20) {
-			$('#load-more-btn').show();
-		}
-
-		$('#load-more-btn').on('click', function () {
-			loadMoreTopics();
-		});
-
-		if (!config.usePagination) {
-			infinitescroll.init(loadMoreTopics);
-		}
-
-		function loadMoreTopics(direction) {
-			if (direction < 0 || !$('[component="category"]').length) {
-				return;
-			}
-
-			infinitescroll.loadMore('topics.loadMoreUnreadTopics', {
-				after: $('[component="category"]').attr('data-nextstart'),
-				count: config.topicsPerPage,
-				cid: utils.params().cid,
-				filter: ajaxify.data.selectedFilter.filter,
-			}, function (data, done) {
-				if (data.topics && data.topics.length) {
-					recent.onTopicsLoaded('unread', data.topics, true, direction, done);
-					$('[component="category"]').attr('data-nextstart', data.nextStart);
-				} else {
-					done();
-					$('#load-more-btn').hide();
-				}
-			});
-		}
 	};
 
 	function doneRemovingTids(tids) {
@@ -125,6 +85,86 @@ define('forum/unread', ['forum/recent', 'topicSelect', 'forum/infinitescroll', '
 		}
 	}
 
+	function updateUnreadTopicCount(url, count) {
+		if (!utils.isNumber(count)) {
+			return;
+		}
+
+		$('a[href="' + config.relative_path + url + '"].navigation-link i')
+			.toggleClass('unread-count', count > 0)
+			.attr('data-content', count > 99 ? '99+' : count);
+	}
+
+	Unread.initUnreadTopics = function () {
+		var unreadTopics = app.user.unreadData;
+
+		function onNewPost(data) {
+			if (data && data.posts && data.posts.length) {
+				var post = data.posts[0];
+				if (parseInt(post.uid, 10) === parseInt(app.user.uid, 10) ||
+					(!post.topic.isFollowing && post.categoryWatchState !== watchStates.watching)
+				) {
+					return;
+				}
+
+				var tid = post.topic.tid;
+				if (!unreadTopics[''][tid] || !unreadTopics.new[tid] ||
+					!unreadTopics.watched[tid] || !unreadTopics.unreplied[tid]) {
+					markTopicsUnread(tid);
+				}
+
+				if (!unreadTopics[''][tid]) {
+					increaseUnreadCount('');
+					unreadTopics[''][tid] = true;
+				}
+				var isNewTopic = post.isMain && parseInt(post.uid, 10) !== parseInt(app.user.uid, 10);
+				if (isNewTopic && !unreadTopics.new[tid]) {
+					increaseUnreadCount('new');
+					unreadTopics.new[tid] = true;
+				}
+				var isUnreplied = parseInt(post.topic.postcount, 10) <= 1;
+				if (isUnreplied && !unreadTopics.unreplied[tid]) {
+					increaseUnreadCount('unreplied');
+					unreadTopics.unreplied[tid] = true;
+				}
+
+				if (post.topic.isFollowing && !unreadTopics.watched[tid]) {
+					increaseUnreadCount('watched');
+					unreadTopics.watched[tid] = true;
+				}
+			}
+		}
+
+		function increaseUnreadCount(filter) {
+			var unreadUrl = '/unread' + (filter ? '?filter=' + filter : '');
+			var newCount = 1 + parseInt($('a[href="' + config.relative_path + unreadUrl + '"].navigation-link i').attr('data-content'), 10);
+			updateUnreadTopicCount(unreadUrl, newCount);
+		}
+
+		function markTopicsUnread(tid) {
+			$('[data-tid="' + tid + '"]').addClass('unread');
+		}
+
+		$(window).on('action:ajaxify.end', function () {
+			if (ajaxify.data.template.topic) {
+				['', 'new', 'watched', 'unreplied'].forEach(function (filter) {
+					delete unreadTopics[filter][ajaxify.data.tid];
+				});
+			}
+		});
+		socket.removeListener('event:new_post', onNewPost);
+		socket.on('event:new_post', onNewPost);
+
+		socket.removeListener('event:unread.updateCount', updateUnreadCounters);
+		socket.on('event:unread.updateCount', updateUnreadCounters);
+	};
+
+	function updateUnreadCounters(data) {
+		updateUnreadTopicCount('/unread', data.unreadTopicCount);
+		updateUnreadTopicCount('/unread?filter=new', data.unreadNewTopicCount);
+		updateUnreadTopicCount('/unread?filter=watched', data.unreadWatchedTopicCount);
+		updateUnreadTopicCount('/unread?filter=unreplied', data.unreadUnrepliedTopicCount);
+	}
 
 	return Unread;
 });

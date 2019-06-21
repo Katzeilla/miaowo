@@ -19,11 +19,7 @@
 
 'use strict';
 
-if (require.main !== module) {
-	require.main.require = function (path) {
-		return require(path);
-	};
-}
+require('./require-main');
 
 var nconf = require('nconf');
 nconf.argv().env({
@@ -45,8 +41,9 @@ var configExists = file.existsSync(configFile) || (nconf.get('url') && nconf.get
 
 var prestart = require('./src/prestart');
 prestart.loadConfig(configFile);
-prestart.versionCheck();
 prestart.setupWinston();
+prestart.versionCheck();
+winston.verbose('* using configuration stored in: %s', configFile);
 
 if (!process.send) {
 	// If run using `node app`, log GNU copyright info along with server info
@@ -92,4 +89,3 @@ if (nconf.get('setup') || nconf.get('install')) {
 } else {
 	require('./src/start').start();
 }
-

@@ -60,6 +60,35 @@ describe('Controllers', function () {
 		});
 	});
 
+	it('should load /config with csrf_token', function (done) {
+		request({
+			url: nconf.get('url') + '/api/config',
+			json: true,
+		}, function (err, response, body) {
+			assert.ifError(err);
+			assert.equal(response.statusCode, 200);
+			assert(body.csrf_token);
+			done();
+		});
+	});
+
+	it('should load /config with no csrf_token as spider', function (done) {
+		request({
+			url: nconf.get('url') + '/api/config',
+			json: true,
+			headers: {
+				'user-agent': 'yandex',
+			},
+		}, function (err, response, body) {
+			assert.ifError(err);
+			assert.equal(response.statusCode, 200);
+			assert.strictEqual(body.csrf_token, false);
+			assert.strictEqual(body.uid, -1);
+			assert.strictEqual(body.loggedIn, false);
+			done();
+		});
+	});
+
 	describe('homepage', function () {
 		function hookMethod(hookData) {
 			assert(hookData.req);
@@ -218,7 +247,7 @@ describe('Controllers', function () {
 					assert.equal(res.statusCode, 200);
 					assert.ok(body);
 					assert.ok(body.indexOf('<main id="panel"'));
-					assert.ok(body.indexOf(message) !== -1);
+					assert.ok(body.includes(message));
 
 					done();
 				});
@@ -801,7 +830,11 @@ describe('Controllers', function () {
 			}, function (err, res, body) {
 				assert.ifError(err);
 				assert.equal(res.statusCode, 403);
-				assert.equal(body, '{"path":"/user/doesnotexist/session/1112233","loggedIn":true,"title":"[[global:403.title]]"}');
+				assert.deepEqual(JSON.parse(body), {
+					path: '/user/doesnotexist/session/1112233',
+					loggedIn: true,
+					title: '[[global:403.title]]',
+				});
 				done();
 			});
 		});
@@ -1052,7 +1085,7 @@ describe('Controllers', function () {
 				request(nconf.get('url') + '/me/bookmarks', { json: true }, function (err, res, body) {
 					assert.ifError(err);
 					assert.equal(res.statusCode, 200);
-					assert(body.indexOf('Login to your account') !== -1);
+					assert(body.includes('Login to your account'));
 					done();
 				});
 			});
@@ -1418,7 +1451,7 @@ describe('Controllers', function () {
 						var contents = body.posts.map(function (p) {
 							return p.content;
 						});
-						assert(contents.indexOf('1st reply') === -1);
+						assert(!contents.includes('1st reply'));
 						done();
 					});
 				},
@@ -1618,6 +1651,7 @@ describe('Controllers', function () {
 	it('should return osd data', function (done) {
 		request(nconf.get('url') + '/osd.xml', function (err, res, body) {
 			assert.ifError(err);
+			assert.equal(res.statusCode, 200);
 			assert(body);
 			done();
 		});
@@ -1633,6 +1667,7 @@ describe('Controllers', function () {
 		it('should handle topic malformed uri', function (done) {
 			request(nconf.get('url') + '/topic/1/a%AFc', function (err, res, body) {
 				assert.ifError(err);
+				assert.equal(res.statusCode, 200);
 				assert(body);
 				done();
 			});
@@ -1641,6 +1676,7 @@ describe('Controllers', function () {
 		it('should handle category malformed uri', function (done) {
 			request(nconf.get('url') + '/category/1/a%AFc', function (err, res, body) {
 				assert.ifError(err);
+				assert.equal(res.statusCode, 200);
 				assert(body);
 				done();
 			});
@@ -1766,16 +1802,23 @@ describe('Controllers', function () {
 			request(nconf.get('url') + '/assets/vendor/jquery/timeago/locales/jquery.timeago.af.js', function (err, res, body) {
 				assert.ifError(err);
 				assert.equal(res.statusCode, 200);
-				assert(body.indexOf('Afrikaans') !== -1);
+				assert(body.includes('Afrikaans'));
 				done();
 			});
 		});
 
-		it('should load timeago locale', function (done) {
-			request(nconf.get('url') + '/assets/vendor/jquery/timeago/locales/jquery.timeago.404.js', function (err, res, body) {
+		it('should return not found if NodeBB language exists but timeago locale does not exist', function (done) {
+			request(nconf.get('url') + '/assets/vendor/jquery/timeago/locales/jquery.timeago.ms.js', function (err, res, body) {
 				assert.ifError(err);
-				assert.equal(res.statusCode, 200);
-				assert(body.indexOf('English') !== -1);
+				assert.equal(res.statusCode, 404);
+				done();
+			});
+		});
+
+		it('should return not found if NodeBB language does not exist', function (done) {
+			request(nconf.get('url') + '/assets/vendor/jquery/timeago/locales/jquery.timeago.muggle.js', function (err, res, body) {
+				assert.ifError(err);
+				assert.equal(res.statusCode, 404);
 				done();
 			});
 		});
@@ -2104,7 +2147,7 @@ describe('Controllers', function () {
 			request(nconf.get('url') + '//admin/advanced/database', { json: true }, function (err, res, body) {
 				assert.ifError(err);
 				assert.equal(res.statusCode, 200);
-				assert(body.indexOf('Login to your account') !== -1);
+				assert(body.includes('Login to your account'));
 				done();
 			});
 		});
@@ -2137,7 +2180,7 @@ describe('Controllers', function () {
 				assert.equal(res.statusCode, 200);
 				assert(body.title);
 				assert(body.template);
-				assert.equal(body.url, '/compose');
+				assert.equal(body.url, nconf.get('relative_path') + '/compose');
 				done();
 			});
 		});
@@ -2158,7 +2201,7 @@ describe('Controllers', function () {
 				assert.equal(res.statusCode, 200);
 				assert(body.title);
 				assert.strictEqual(body.template.name, '');
-				assert.strictEqual(body.url, '/compose');
+				assert.strictEqual(body.url, nconf.get('relative_path') + '/compose');
 
 				plugins.unregisterHook('myTestPlugin', 'filter:composer.build', hookMethod);
 				done();

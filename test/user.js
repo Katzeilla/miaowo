@@ -5,6 +5,7 @@ var async = require('async');
 var path = require('path');
 var nconf = require('nconf');
 var request = require('request');
+var jwt = require('jsonwebtoken');
 
 var db = require('./mocks/databasemock');
 var User = require('../src/user');
@@ -456,12 +457,19 @@ describe('User', function () {
 			User.reset.commit(code, 'newpassword', function (err) {
 				assert.ifError(err);
 
-				db.getObject('user:' + uid, function (err, userData) {
+				async.parallel({
+					userData: function (next) {
+						User.getUserData(uid, next);
+					},
+					password: function (next) {
+						db.getObjectField('user:' + uid, 'password', next);
+					},
+				}, function (err, results) {
 					assert.ifError(err);
-					Password.compare('newpassword', userData.password, function (err, match) {
+					Password.compare('newpassword', results.password, function (err, match) {
 						assert.ifError(err);
 						assert(match);
-						assert.equal(parseInt(userData['email:confirmed'], 10), 1);
+						assert.strictEqual(results.userData['email:confirmed'], 1);
 						done();
 					});
 				});
@@ -552,7 +560,8 @@ describe('User', function () {
 					assert(!userData.hasOwnProperty('another_secret'));
 					assert(!userData.hasOwnProperty('password'));
 					assert(!userData.hasOwnProperty('rss_token'));
-					assert.equal(userData.postcount, '123');
+					assert.strictEqual(userData.postcount, 123);
+					assert.strictEqual(userData.uid, testUid);
 					done();
 				});
 			});
@@ -594,6 +603,25 @@ describe('User', function () {
 			User.getUidsByEmails(['john@example.com'], function (err, uids) {
 				assert.ifError(err);
 				assert.equal(uids[0], testUid);
+				done();
+			});
+		});
+
+		it('should not get groupTitle for guests', function (done) {
+			User.getUserData(0, function (err, userData) {
+				assert.ifError(err);
+				assert.strictEqual(userData.groupTitle, '');
+				assert.deepStrictEqual(userData.groupTitleArray, []);
+				done();
+			});
+		});
+
+		it('should load guest data', function (done) {
+			User.getUsersData([1, 0], function (err, data) {
+				assert.ifError(err);
+				assert.strictEqual(data[1].username, '[[global:guest]]');
+				assert.strictEqual(data[1].userslug, '');
+				assert.strictEqual(data[1].uid, 0);
 				done();
 			});
 		});
@@ -1230,6 +1258,9 @@ describe('User', function () {
 				function (next) {
 					User.setSetting(uid, 'dailyDigestFreq', 'day', next);
 				},
+				function (next) {
+					User.setSetting(uid, 'notificationType_test', 'notificationemail', next);
+				},
 			], done);
 		});
 
@@ -1244,6 +1275,110 @@ describe('User', function () {
 			User.digest.execute({ interval: 'month' }, function (err) {
 				assert.ifError(err);
 				done();
+			});
+		});
+
+		describe('unsubscribe via POST', function () {
+			it('should unsubscribe from digest if one-click unsubscribe is POSTed', function (done) {
+				const token = jwt.sign({
+					template: 'digest',
+					uid: uid,
+				}, nconf.get('secret'));
+
+				request({
+					method: 'post',
+					url: nconf.get('url') + '/email/unsubscribe/' + token,
+				}, function (err, res) {
+					assert.ifError(err);
+					assert.strictEqual(res.statusCode, 200);
+
+					db.getObjectField('user:' + uid + ':settings', 'dailyDigestFreq', function (err, value) {
+						assert.ifError(err);
+						assert.strictEqual(value, 'off');
+						done();
+					});
+				});
+			});
+
+			it('should unsubscribe from notifications if one-click unsubscribe is POSTed', function (done) {
+				const token = jwt.sign({
+					template: 'notification',
+					type: 'test',
+					uid: uid,
+				}, nconf.get('secret'));
+
+				request({
+					method: 'post',
+					url: nconf.get('url') + '/email/unsubscribe/' + token,
+				}, function (err, res) {
+					assert.ifError(err);
+					assert.strictEqual(res.statusCode, 200);
+
+					db.getObjectField('user:' + uid + ':settings', 'notificationType_test', function (err, value) {
+						assert.ifError(err);
+						assert.strictEqual(value, 'notification');
+						done();
+					});
+				});
+			});
+
+			it('should return errors on missing template in token', function (done) {
+				const token = jwt.sign({
+					uid: uid,
+				}, nconf.get('secret'));
+
+				request({
+					method: 'post',
+					url: nconf.get('url') + '/email/unsubscribe/' + token,
+				}, function (err, res) {
+					assert.ifError(err);
+					assert.strictEqual(res.statusCode, 404);
+					done();
+				});
+			});
+
+			it('should return errors on wrong template in token', function (done) {
+				const token = jwt.sign({
+					template: 'user',
+					uid: uid,
+				}, nconf.get('secret'));
+
+				request({
+					method: 'post',
+					url: nconf.get('url') + '/email/unsubscribe/' + token,
+				}, function (err, res) {
+					assert.ifError(err);
+					assert.strictEqual(res.statusCode, 404);
+					done();
+				});
+			});
+
+			it('should return errors on missing token', function (done) {
+				request({
+					method: 'post',
+					url: nconf.get('url') + '/email/unsubscribe/',
+				}, function (err, res) {
+					assert.ifError(err);
+					assert.strictEqual(res.statusCode, 404);
+					done();
+				});
+			});
+
+			it('should return errors on token signed with wrong secret (verify-failure)', function (done) {
+				const token = jwt.sign({
+					template: 'notification',
+					type: 'test',
+					uid: uid,
+				}, nconf.get('secret') + 'aababacaba');
+
+				request({
+					method: 'post',
+					url: nconf.get('url') + '/email/unsubscribe/' + token,
+				}, function (err, res) {
+					assert.ifError(err);
+					assert.strictEqual(res.statusCode, 403);
+					done();
+				});
 			});
 		});
 	});
@@ -1376,7 +1511,6 @@ describe('User', function () {
 					homePageCustom: '',
 					openOutgoingLinksInNewTab: 0,
 					scrollToMyPost: 1,
-					delayImageLoading: 1,
 					userLang: 'en-GB',
 					usePagination: 1,
 					topicsPerPage: '10',
@@ -1472,6 +1606,34 @@ describe('User', function () {
 						done();
 					});
 				});
+			});
+		});
+
+		it('should fail to add user to queue if username is taken', function (done) {
+			helpers.registerUser({
+				username: 'rejectme',
+				password: '123456',
+				'password-confirm': '123456',
+				email: '<script>alert("ok")<script>reject@me.com',
+				gdpr_consent: true,
+			}, function (err, jar, res, body) {
+				assert.ifError(err);
+				assert.equal(body, '[[error:username-taken]]');
+				done();
+			});
+		});
+
+		it('should fail to add user to queue if email is taken', function (done) {
+			helpers.registerUser({
+				username: 'rejectmenew',
+				password: '123456',
+				'password-confirm': '123456',
+				email: '<script>alert("ok")<script>reject@me.com',
+				gdpr_consent: true,
+			}, function (err, jar, res, body) {
+				assert.ifError(err);
+				assert.equal(body, '[[error:email-taken]]');
+				done();
 			});
 		});
 

@@ -5,6 +5,7 @@ var async = require('async');
 var nconf = require('nconf');
 
 var user = require('../user');
+var categories = require('../categories');
 var topics = require('../topics');
 var meta = require('../meta');
 var helpers = require('./helpers');
@@ -47,8 +48,8 @@ recentController.getData = function (req, url, sort, callback) {
 				settings: function (next) {
 					user.getSettings(req.uid, next);
 				},
-				watchedCategories: function (next) {
-					helpers.getWatchedCategories(req.uid, cid, next);
+				categories: function (next) {
+					helpers.getCategoriesByStates(req.uid, cid, [categories.watchStates.watching, categories.watchStates.notwatching], next);
 				},
 				rssToken: function (next) {
 					user.auth.getFeedToken(req.uid, next);
@@ -58,7 +59,7 @@ recentController.getData = function (req, url, sort, callback) {
 		function (results, next) {
 			rssToken = results.rssToken;
 			settings = results.settings;
-			categoryData = results.watchedCategories;
+			categoryData = results.categories;
 
 			var start = Math.max(0, (page - 1) * settings.topicsPerPage);
 			stop = start + settings.topicsPerPage - 1;
@@ -71,6 +72,7 @@ recentController.getData = function (req, url, sort, callback) {
 				filter: filter,
 				term: term,
 				sort: sort,
+				query: req.query,
 			}, next);
 		},
 		function (data, next) {
@@ -78,8 +80,7 @@ recentController.getData = function (req, url, sort, callback) {
 			data.allCategoriesUrl = url + helpers.buildQueryString('', filter, '');
 			data.selectedCategory = categoryData.selectedCategory;
 			data.selectedCids = categoryData.selectedCids;
-			data.nextStart = stop + 1;
-			data['feeds:disableRSS'] = parseInt(meta.config['feeds:disableRSS'], 10) === 1;
+			data['feeds:disableRSS'] = meta.config['feeds:disableRSS'];
 			data.rssFeedUrl = nconf.get('relative_path') + '/' + url + '.rss';
 			if (req.loggedIn) {
 				data.rssFeedUrl += '?uid=' + req.uid + '&token=' + rssToken;

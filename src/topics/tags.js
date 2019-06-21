@@ -4,9 +4,10 @@
 var async = require('async');
 var validator = require('validator');
 
+var _ = require('lodash');
 var db = require('../database');
 var meta = require('../meta');
-var _ = require('lodash');
+var categories = require('../categories');
 var plugins = require('../plugins');
 var utils = require('../utils');
 var batch = require('../batch');
@@ -59,15 +60,14 @@ module.exports = function (Topics) {
 				Topics.getTopicField(tid, 'cid', next);
 			},
 			function (cid, next) {
-				db.getSortedSetRange('cid:' + cid + ':tag:whitelist', 0, -1, next);
+				categories.getTagWhitelist([cid], next);
 			},
 			function (tagWhitelist, next) {
-				if (!tagWhitelist.length) {
+				if (!Array.isArray(tagWhitelist[0]) || !tagWhitelist[0].length) {
 					return next(null, tags);
 				}
-				tags = tags.filter(function (tag) {
-					return tagWhitelist.indexOf(tag) !== -1;
-				});
+				const whitelistSet = new Set(tagWhitelist[0]);
+				tags = tags.filter(tag => whitelistSet.has(tag));
 				next(null, tags);
 			},
 		], callback);
@@ -232,13 +232,13 @@ module.exports = function (Topics) {
 	};
 
 	Topics.getTagData = function (tags, callback) {
-		var keys = tags.map(function (tag) {
-			return 'tag:' + tag.value;
-		});
+		if (!tags.length) {
+			return setImmediate(callback, null, []);
+		}
 
 		async.waterfall([
 			function (next) {
-				db.getObjects(keys, next);
+				db.getObjects(tags.map(tag => 'tag:' + tag.value), next);
 			},
 			function (tagData, next) {
 				tags.forEach(function (tag, index) {
@@ -256,9 +256,7 @@ module.exports = function (Topics) {
 	};
 
 	Topics.getTopicsTags = function (tids, callback) {
-		var keys = tids.map(function (tid) {
-			return 'topic:' + tid + ':tags';
-		});
+		const keys = tids.map(tid => 'topic:' + tid + ':tags');
 		db.getSetsMembers(keys, callback);
 	};
 
@@ -269,9 +267,7 @@ module.exports = function (Topics) {
 	};
 
 	Topics.getTopicsTagsObjects = function (tids, callback) {
-		var sets = tids.map(function (tid) {
-			return 'topic:' + tid + ':tags';
-		});
+		const sets = tids.map(tid => 'topic:' + tid + ':tags');
 		var uniqueTopicTags;
 		var topicTags;
 		async.waterfall([
@@ -282,9 +278,7 @@ module.exports = function (Topics) {
 				topicTags = _topicTags;
 				uniqueTopicTags = _.uniq(_.flatten(topicTags));
 
-				var tags = uniqueTopicTags.map(function (tag) {
-					return { value: tag };
-				});
+				var tags = uniqueTopicTags.map(tag => ({ value: tag }));
 
 				async.parallel({
 					tagData: function (next) {
@@ -405,14 +399,14 @@ module.exports = function (Topics) {
 		async.waterfall([
 			function (next) {
 				if (parseInt(cid, 10)) {
-					db.getSortedSetRange('cid:' + cid + ':tag:whitelist', 0, -1, next);
+					categories.getTagWhitelist([cid], next);
 				} else {
 					setImmediate(next, null, []);
 				}
 			},
 			function (tagWhitelist, next) {
-				if (tagWhitelist.length) {
-					setImmediate(next, null, tagWhitelist);
+				if (Array.isArray(tagWhitelist[0]) && tagWhitelist[0].length) {
+					setImmediate(next, null, tagWhitelist[0]);
 				} else {
 					db.getSortedSetRevRange('tags:topic:count', 0, -1, next);
 				}
@@ -486,7 +480,7 @@ module.exports = function (Topics) {
 			return plugins.fireHook('filter:topic.getRelatedTopics', { topic: topicData, uid: uid }, callback);
 		}
 
-		var maximumTopics = parseInt(meta.config.maximumRelatedTopics, 10) || 0;
+		var maximumTopics = meta.config.maximumRelatedTopics;
 		if (maximumTopics === 0 || !topicData.tags || !topicData.tags.length) {
 			return callback(null, []);
 		}

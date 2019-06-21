@@ -32,19 +32,23 @@ image.resizeImage = function (data, callback) {
 			callback(err);
 		});
 	} else {
+		var sharpImage;
 		async.waterfall([
 			function (next) {
 				fs.readFile(data.path, next);
 			},
 			function (buffer, next) {
 				var sharp = requireSharp();
-				var sharpImage = sharp(buffer, {
+				sharpImage = sharp(buffer, {
 					failOnError: true,
 				});
+				sharpImage.metadata(next);
+			},
+			function (metadata, next) {
 				sharpImage.rotate(); // auto-orients based on exif data
 				sharpImage.resize(data.hasOwnProperty('width') ? data.width : null, data.hasOwnProperty('height') ? data.height : null);
 
-				if (data.quality) {
+				if (data.quality && metadata.format === 'jpeg') {
 					sharpImage.jpeg({ quality: data.quality });
 				}
 
@@ -93,8 +97,8 @@ image.checkDimensions = function (path, callback) {
 			return callback(err);
 		}
 
-		const maxWidth = parseInt(meta.config.rejectImageWidth, 10) || 5000;
-		const maxHeight = parseInt(meta.config.rejectImageHeight, 10) || 5000;
+		const maxWidth = meta.config.rejectImageWidth;
+		const maxHeight = meta.config.rejectImageHeight;
 		if (result.width > maxWidth || result.height > maxHeight) {
 			return callback(new Error('[[error:invalid-image-dimensions]]'));
 		}
@@ -134,4 +138,29 @@ image.writeImageDataToTempFile = function (imageData, callback) {
 
 image.sizeFromBase64 = function (imageData) {
 	return Buffer.from(imageData.slice(imageData.indexOf('base64') + 7), 'base64').length;
+};
+
+image.uploadImage = function (filename, folder, image, callback) {
+	if (plugins.hasListeners('filter:uploadImage')) {
+		return plugins.fireHook('filter:uploadImage', {
+			image: image,
+			uid: image.uid,
+		}, callback);
+	}
+
+	async.waterfall([
+		function (next) {
+			file.isFileTypeAllowed(image.path, next);
+		},
+		function (next) {
+			file.saveFileToLocal(filename, folder, image.path, next);
+		},
+		function (upload, next) {
+			next(null, {
+				url: upload.url,
+				path: upload.path,
+				name: image.name,
+			});
+		},
+	], callback);
 };

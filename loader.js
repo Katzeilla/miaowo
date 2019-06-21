@@ -7,6 +7,7 @@ var path = require('path');
 var fork = require('child_process').fork;
 var async = require('async');
 var logrotate = require('logrotate-stream');
+var mkdirp = require('mkdirp');
 
 var file = require('./src/file');
 var pkg = require('./package.json');
@@ -18,7 +19,14 @@ nconf.argv().env().file({
 });
 
 var	pidFilePath = path.join(__dirname, 'pidfile');
-var outputLogFilePath = path.join(__dirname, 'logs/output.log');
+
+var outputLogFilePath = path.join(__dirname, nconf.get('logFile') || 'logs/output.log');
+
+var logDir = path.dirname(outputLogFilePath);
+if (!fs.existsSync(logDir)) {
+	mkdirp.sync(path.dirname(outputLogFilePath));
+}
+
 var output = logrotate({ file: outputLogFilePath, size: '1m', keep: 3, compress: true });
 var silent = nconf.get('silent') === 'false' ? false : nconf.get('silent') !== false;
 var numProcs;
@@ -200,39 +208,40 @@ function killWorkers() {
 }
 
 fs.open(pathToConfig, 'r', function (err) {
-	if (!err) {
-		if (nconf.get('daemon') !== 'false' && nconf.get('daemon') !== false) {
-			if (file.existsSync(pidFilePath)) {
-				try {
-					var	pid = fs.readFileSync(pidFilePath, { encoding: 'utf-8' });
-					process.kill(pid, 0);
-					process.exit();
-				} catch (e) {
-					fs.unlinkSync(pidFilePath);
-				}
-			}
-
-			require('daemon')({
-				stdout: process.stdout,
-				stderr: process.stderr,
-				cwd: process.cwd(),
-			});
-
-			fs.writeFileSync(pidFilePath, process.pid);
-		}
-
-		async.series([
-			Loader.init,
-			Loader.displayStartupMessages,
-			Loader.start,
-		], function (err) {
-			if (err) {
-				console.error('[loader] Error during startup');
-				throw err;
-			}
-		});
-	} else {
+	if (err) {
 		// No config detected, kickstart web installer
 		fork('app');
+		return;
 	}
+
+	if (nconf.get('daemon') !== 'false' && nconf.get('daemon') !== false) {
+		if (file.existsSync(pidFilePath)) {
+			try {
+				var	pid = fs.readFileSync(pidFilePath, { encoding: 'utf-8' });
+				process.kill(pid, 0);
+				process.exit();
+			} catch (e) {
+				fs.unlinkSync(pidFilePath);
+			}
+		}
+
+		require('daemon')({
+			stdout: process.stdout,
+			stderr: process.stderr,
+			cwd: process.cwd(),
+		});
+
+		fs.writeFileSync(pidFilePath, process.pid);
+	}
+
+	async.series([
+		Loader.init,
+		Loader.displayStartupMessages,
+		Loader.start,
+	], function (err) {
+		if (err) {
+			console.error('[loader] Error during startup');
+			throw err;
+		}
+	});
 });

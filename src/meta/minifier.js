@@ -26,7 +26,9 @@ Object.defineProperty(Minifier, 'maxThreads', {
 	},
 	set: function (val) {
 		maxThreads = val;
-		winston.verbose('[minifier] utilizing a maximum of ' + maxThreads + ' additional threads');
+		if (!process.env.minifier_child) {
+			winston.verbose('[minifier] utilizing a maximum of ' + maxThreads + ' additional threads');
+		}
 	},
 	configurable: true,
 	enumerable: true,
@@ -40,6 +42,7 @@ Minifier.killAll = function () {
 	});
 
 	pool.length = 0;
+	free.length = 0;
 };
 
 function getChild() {
@@ -65,7 +68,9 @@ function freeChild(proc) {
 
 function removeChild(proc) {
 	var i = pool.indexOf(proc);
-	pool.splice(i, 1);
+	if (i !== -1) {
+		pool.splice(i, 1);
+	}
 }
 
 function forkAction(action, callback) {
@@ -164,7 +169,7 @@ function concat(data, callback) {
 actions.concat = concat;
 
 function minifyJS_batch(data, callback) {
-	async.each(data.files, function (fileObj, next) {
+	async.eachLimit(data.files, 100, function (fileObj, next) {
 		fs.readFile(fileObj.srcPath, 'utf8', function (err, source) {
 			if (err) {
 				return next(err);
@@ -227,7 +232,7 @@ function minifyAndSave(data, callback) {
 	var minified = uglify.minify(scripts, {
 		sourceMap: {
 			filename: data.filename,
-			url: data.filename + '.map',
+			url: String(data.filename).split(/[/\\]/).pop() + '.map',
 			includeSources: true,
 		},
 		compress: false,

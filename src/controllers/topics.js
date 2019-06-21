@@ -3,6 +3,7 @@
 
 var async = require('async');
 var nconf = require('nconf');
+var winston = require('winston');
 
 var user = require('../user');
 var meta = require('../meta');
@@ -17,7 +18,7 @@ var analytics = require('../analytics');
 
 var topicsController = module.exports;
 
-topicsController.get = function (req, res, callback) {
+topicsController.get = function getTopic(req, res, callback) {
 	var tid = req.params.topic_id;
 	var currentPage = parseInt(req.query.page, 10) || 1;
 	var pageCount = 1;
@@ -54,7 +55,7 @@ topicsController.get = function (req, res, callback) {
 			userPrivileges = results.privileges;
 			rssToken = results.rssToken;
 
-			if (!userPrivileges['topics:read'] || (parseInt(results.topic.deleted, 10) && !userPrivileges.view_deleted)) {
+			if (!userPrivileges['topics:read'] || (results.topic.deleted && !userPrivileges.view_deleted)) {
 				return helpers.notAllowed(req, res);
 			}
 
@@ -70,7 +71,7 @@ topicsController.get = function (req, res, callback) {
 			}
 
 			settings = results.settings;
-			var postCount = parseInt(results.topic.postcount, 10);
+			var postCount = results.topic.postcount;
 			pageCount = Math.max(1, Math.ceil(postCount / settings.postsPerPage));
 			results.topic.postcount = postCount;
 
@@ -138,15 +139,15 @@ topicsController.get = function (req, res, callback) {
 		},
 		function (topicData) {
 			topicData.privileges = userPrivileges;
-			topicData.topicStaleDays = parseInt(meta.config.topicStaleDays, 10) || 60;
-			topicData['reputation:disabled'] = parseInt(meta.config['reputation:disabled'], 10) === 1;
-			topicData['downvote:disabled'] = parseInt(meta.config['downvote:disabled'], 10) === 1;
-			topicData['feeds:disableRSS'] = parseInt(meta.config['feeds:disableRSS'], 10) === 1;
-			topicData.bookmarkThreshold = parseInt(meta.config.bookmarkThreshold, 10) || 5;
-			topicData.postEditDuration = parseInt(meta.config.postEditDuration, 10) || 0;
-			topicData.postDeleteDuration = parseInt(meta.config.postDeleteDuration, 10) || 0;
+			topicData.topicStaleDays = meta.config.topicStaleDays;
+			topicData['reputation:disabled'] = meta.config['reputation:disabled'];
+			topicData['downvote:disabled'] = meta.config['downvote:disabled'];
+			topicData['feeds:disableRSS'] = meta.config['feeds:disableRSS'];
+			topicData.bookmarkThreshold = meta.config.bookmarkThreshold;
+			topicData.postEditDuration = meta.config.postEditDuration;
+			topicData.postDeleteDuration = meta.config.postDeleteDuration;
 			topicData.scrollToMyPost = settings.scrollToMyPost;
-			topicData.allowMultipleBadges = parseInt(meta.config.allowMultipleBadges, 10) === 1;
+			topicData.allowMultipleBadges = meta.config.allowMultipleBadges === 1;
 			topicData.rssFeedUrl = nconf.get('relative_path') + '/topic/' + topicData.tid + '.rss';
 			if (req.loggedIn) {
 				topicData.rssFeedUrl += '?uid=' + req.uid + '&token=' + rssToken;
@@ -161,16 +162,18 @@ topicsController.get = function (req, res, callback) {
 				res.locals.linkTags.push(rel);
 			});
 
-			req.session.tids_viewed = req.session.tids_viewed || {};
-			if (!req.session.tids_viewed[tid] || req.session.tids_viewed[tid] < Date.now() - 3600000) {
-				topics.increaseViewCount(tid);
-				req.session.tids_viewed[tid] = Date.now();
+			if (req.uid >= 0) {
+				req.session.tids_viewed = req.session.tids_viewed || {};
+				if (!req.session.tids_viewed[tid] || req.session.tids_viewed[tid] < Date.now() - 3600000) {
+					topics.increaseViewCount(tid);
+					req.session.tids_viewed[tid] = Date.now();
+				}
 			}
 
 			if (req.loggedIn) {
 				topics.markAsRead([tid], req.uid, function (err, markedRead) {
 					if (err) {
-						return callback(err);
+						return winston.error(err);
 					}
 					if (markedRead) {
 						topics.pushUnreadCount(req.uid);
@@ -386,11 +389,11 @@ topicsController.pagination = function (req, res, callback) {
 			return callback(err);
 		}
 
-		if (!results.privileges.read || (parseInt(results.topic.deleted, 10) && !results.privileges.view_deleted)) {
+		if (!results.privileges.read || (results.topic.deleted && !results.privileges.view_deleted)) {
 			return helpers.notAllowed(req, res);
 		}
 
-		var postCount = parseInt(results.topic.postcount, 10);
+		var postCount = results.topic.postcount;
 		var pageCount = Math.max(1, Math.ceil(postCount / results.settings.postsPerPage));
 
 		var paginationData = pagination.create(currentPage, pageCount);

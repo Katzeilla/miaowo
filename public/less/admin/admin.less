@@ -23,8 +23,10 @@
 @import "./extend/rewards";
 @import "./extend/widgets";
 @import "./advanced/database";
+@import "./advanced/events";
 @import "./advanced/logs";
 @import "./advanced/errors";
+@import "./advanced/hooks";
 @import "./settings";
 
 @import "../flags";
@@ -234,10 +236,14 @@ body {
 		margin: 35px 5px 0 5px;
 	}
 }
-
-.category-dropdown-menu {
-  max-height: 600px;
-  overflow-y: auto;
+[component="category-selector"] {
+	.fa-stack {
+		border-radius: 50%;
+	}
+	.category-dropdown-menu {
+		max-height: 600px;
+		overflow-y: auto;
+	}
 }
 
 .table-reordering {

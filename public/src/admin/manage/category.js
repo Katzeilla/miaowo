@@ -39,16 +39,9 @@ define('admin/manage/category', [
 
 		handleTags();
 
-		$('#category-settings input, #category-settings select').not($('.privilege-table-container input'))
-			.on('change', function (ev) {
-				modified(ev.target);
-			})
-			.on('keydown', function (ev) {
-				if (ev.which === 13) {
-					ev.preventDefault();
-					return false;
-				}
-			});
+		$('#category-settings input, #category-settings select').on('change', function (ev) {
+			modified(ev.target);
+		});
 
 		$('[data-name="imageClass"]').on('change', function () {
 			$('.category-preview').css('background-size', $(this).val());
@@ -240,8 +233,13 @@ define('admin/manage/category', [
 	}
 
 	Category.launchParentSelector = function () {
+		var parents = [parseInt(ajaxify.data.category.cid, 10)];
 		var categories = ajaxify.data.allCategories.filter(function (category) {
-			return category && !category.disabled && parseInt(category.cid, 10) !== parseInt(ajaxify.data.category.cid, 10);
+			var isChild = parents.includes(parseInt(category.parentCid, 10));
+			if (isChild) {
+				parents.push(parseInt(category.cid, 10));
+			}
+			return category && !category.disabled && parseInt(category.cid, 10) !== parseInt(ajaxify.data.category.cid, 10) && !isChild;
 		});
 
 		categorySelector.modal(categories, function (parentCid) {

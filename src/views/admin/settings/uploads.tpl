@@ -28,12 +28,26 @@
 				</p>
 			</div>
 
-			<div class="form-group">
-				<label for="maximumImageWidth">[[admin/settings/uploads:max-image-width]]</label>
-				<input type="text" class="form-control" value="760" data-field="maximumImageWidth" placeholder="760">
-				<p class="help-block">
-					[[admin/settings/uploads:max-image-width-help]]
-				</p>
+			<div class="row">
+				<div class="col-xs-6">
+					<div class="form-group">
+						<label for="resizeImageWidthThreshold">[[admin/settings/uploads:resize-image-width-threshold]]</label>
+						<input type="text" class="form-control" value="2000" data-field="resizeImageWidthThreshold" placeholder="2000">
+						<p class="help-block">
+							[[admin/settings/uploads:resize-image-width-threshold-help]]
+						</p>
+					</div>
+				</div>
+
+				<div class="col-xs-6">
+					<div class="form-group">
+						<label for="resizeImageWidth">[[admin/settings/uploads:resize-image-width]]</label>
+						<input type="text" class="form-control" value="760" data-field="resizeImageWidth" placeholder="760">
+						<p class="help-block">
+							[[admin/settings/uploads:resize-image-width-help]]
+						</p>
+					</div>
+				</div>
 			</div>
 
 			<div class="form-group">
@@ -89,6 +103,7 @@
 			</div>
 		</form>
 	</div>
+
 </div>
 
 <div class="row">
@@ -163,7 +178,7 @@
 			<p class="help-block">
 				[[admin/settings/uploads:default-covers-help]]
 			</p>
-			<input type="text" class="form-control input-lg" id="profile:defaultCovers" data-field="profile:defaultCovers" data-field-type="tagsinput" value="{config.relative_path}/assets/images/cover-default.png" placeholder="https://example.com/group1.png, https://example.com/group2.png" />
+			<input type="text" class="form-control input-lg" id="profile:defaultCovers" data-field="profile:defaultCovers" data-field-type="tagsinput" value="/assets/images/cover-default.png" placeholder="https://example.com/group1.png, https://example.com/group2.png" />
 		</form>
 	</div>
 </div>

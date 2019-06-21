@@ -38,7 +38,7 @@
 
 	"control-panel": "Controle do Sistema",
 	"rebuild-and-restart": "Rebuild &amp; Restart",
-	"restart": "Restart",
+	"restart": "Reiniciar",
 	"restart-warning": "Rebuilding or Restarting your NodeBB will drop all existing connections for a few seconds.",
 	"restart-disabled": "Rebuilding and Restarting your NodeBB has been disabled as you do not seem to be running it via the appropriate daemon.",
 	"maintenance-mode": "Modo de Manutenção",
@@ -65,6 +65,9 @@
 	"high-presence-topics": "Tópicos de Alta Presença",
 
 	"graphs.page-views": "Visualizações de Página",
+	"graphs.page-views-registered": "Page Views Registered",
+	"graphs.page-views-guest": "Page Views Guest",
+	"graphs.page-views-bot": "Page Views Bot",
 	"graphs.unique-visitors": "Visitantes Únicos",
 	"graphs.registered-users": "Usuários Registrados",
 	"graphs.anonymous-users": "Usuários Anônimos",

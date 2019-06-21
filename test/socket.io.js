@@ -468,6 +468,7 @@ describe('socket.io', function () {
 	});
 
 	it('should toggle plugin install', function (done) {
+		this.timeout(0);
 		socketAdmin.plugins.toggleInstall({ uid: adminUid }, { id: 'nodebb-plugin-location-to-map', version: 'latest' }, function (err, data) {
 			assert.ifError(err);
 			assert.equal(data.name, 'nodebb-plugin-location-to-map');
@@ -575,6 +576,20 @@ describe('socket.io', function () {
 				assert.ifError(err);
 				assert(!exists);
 				done();
+			});
+		});
+	});
+
+	it('should delete a single event', function (done) {
+		db.getSortedSetRevRange('events:time', 0, 0, function (err, eids) {
+			assert.ifError(err);
+			socketAdmin.deleteEvents({ uid: adminUid }, eids, function (err) {
+				assert.ifError(err);
+				db.isSortedSetMembers('events:time', eids, function (err, isMembers) {
+					assert.ifError(err);
+					assert(!isMembers.includes(true));
+					done();
+				});
 			});
 		});
 	});

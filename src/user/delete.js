@@ -18,7 +18,7 @@ module.exports = function (User) {
 	var deletesInProgress = {};
 
 	User.delete = function (callerUid, uid, callback) {
-		if (!parseInt(uid, 10)) {
+		if (parseInt(uid, 10) <= 0) {
 			return setImmediate(callback, new Error('[[error:invalid-uid]]'));
 		}
 		if (deletesInProgress[uid]) {
@@ -160,7 +160,7 @@ module.exports = function (User) {
 							'uid:' + uid + ':chats', 'uid:' + uid + ':chats:unread',
 							'uid:' + uid + ':chat:rooms', 'uid:' + uid + ':chat:rooms:unread',
 							'uid:' + uid + ':upvote', 'uid:' + uid + ':downvote',
-							'uid:' + uid + ':ignored:cids', 'uid:' + uid + ':flag:pids',
+							'uid:' + uid + ':flag:pids',
 							'uid:' + uid + ':sessions', 'uid:' + uid + ':sessionUUID:sessionId',
 						];
 						db.deleteAll(keys, next);

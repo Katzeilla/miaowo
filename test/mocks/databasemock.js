@@ -5,14 +5,24 @@
  * ATTENTION: testing db is flushed before every use!
  */
 
+require('../../require-main');
+
 var async = require('async');
-var winston = require('winston');
 var path = require('path');
 var nconf = require('nconf');
 var url = require('url');
-var errorText;
 
+global.env = process.env.TEST_ENV || 'production';
+
+var winston = require('winston');
 var packageInfo = require('../../package');
+
+winston.add(new winston.transports.Console({
+	format: winston.format.combine(
+		winston.format.splat(),
+		winston.format.simple()
+	),
+}));
 
 nconf.file({ file: path.join(__dirname, '../../config.json') });
 nconf.defaults({
@@ -22,6 +32,10 @@ nconf.defaults({
 	views_dir: path.join(__dirname, '../../build/public/templates'),
 	relative_path: '',
 });
+
+var urlObject = url.parse(nconf.get('url'));
+var relativePath = urlObject.pathname !== '/' ? urlObject.pathname : '';
+nconf.set('relative_path', relativePath);
 
 if (!nconf.get('isCluster')) {
 	nconf.set('isPrimary', 'true');
@@ -33,7 +47,7 @@ var testDbConfig = nconf.get('test_database');
 var productionDbConfig = nconf.get(dbType);
 
 if (!testDbConfig) {
-	errorText = 'test_database is not defined';
+	const errorText = 'test_database is not defined';
 	winston.info(
 		'\n===========================================================\n' +
 		'Please, add parameters for test database in config.json\n' +
@@ -76,16 +90,15 @@ if (!testDbConfig) {
 if (testDbConfig.database === productionDbConfig.database &&
 	testDbConfig.host === productionDbConfig.host &&
 	testDbConfig.port === productionDbConfig.port) {
-	errorText = 'test_database has the same config as production db';
+	const errorText = 'test_database has the same config as production db';
 	winston.error(errorText);
 	throw new Error(errorText);
 }
 
 nconf.set(dbType, testDbConfig);
 
-winston.info('database config');
-winston.info(dbType);
-winston.info(testDbConfig);
+winston.info('database config %s', dbType, testDbConfig);
+winston.info('environment ' + global.env);
 
 var db = require('../../src/database');
 module.exports = db;
@@ -164,6 +177,10 @@ function setupMockDefaults(callback) {
 		function (next) {
 			var groups = require('../../src/groups');
 			groups.resetCache();
+			var postCache = require('../../src/posts/cache');
+			postCache.reset();
+			var localCache = require('../../src/cache');
+			localCache.reset();
 			next();
 		},
 		function (next) {
@@ -212,7 +229,8 @@ function setupDefaultConfigs(meta, next) {
 	winston.info('Populating database with default configs, if not already set...\n');
 
 	var defaults = require(path.join(nconf.get('base_dir'), 'install/data/defaults.json'));
-
+	defaults.eventLoopCheckEnabled = 0;
+	defaults.minimumPasswordStrength = 0;
 	meta.configs.setOnEmpty(defaults, next);
 }
 

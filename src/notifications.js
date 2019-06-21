@@ -24,6 +24,7 @@ Notifications.baseTypes = [
 	'notificationType_follow',
 	'notificationType_new-chat',
 	'notificationType_group-invite',
+	'notificationType_group-request-membership',
 ];
 
 Notifications.privilegedTypes = [
@@ -122,27 +123,20 @@ Notifications.filterExists = function (nids, callback) {
 
 Notifications.findRelated = function (mergeIds, set, callback) {
 	// A related notification is one in a zset that has the same mergeId
-	var _nids;
+	var nids;
 
 	async.waterfall([
 		async.apply(db.getSortedSetRevRange, set, 0, -1),
-		function (nids, next) {
-			_nids = nids;
+		function (_nids, next) {
+			nids = _nids;
 
-			var keys = nids.map(function (nid) {
-				return 'notifications:' + nid;
-			});
-
+			var keys = nids.map(nid => 'notifications:' + nid);
 			db.getObjectsFields(keys, ['mergeId'], next);
 		},
 		function (sets, next) {
-			sets = sets.map(function (set) {
-				return set.mergeId;
-			});
-
-			next(null, _nids.filter(function (nid, idx) {
-				return mergeIds.indexOf(sets[idx]) !== -1;
-			}));
+			sets = sets.map(set => String(set.mergeId));
+			var mergeSet = new Set(mergeIds.map(id => String(id)));
+			next(null, nids.filter((nid, idx) => mergeSet.has(sets[idx])));
 		},
 	], callback);
 };
@@ -250,9 +244,9 @@ function pushToUids(uids, notification, callback) {
 		async.eachLimit(uids, 3, function (uid, next) {
 			emailer.send('notification', uid, {
 				path: notification.path,
-				subject: utils.stripHTMLTags(notification.subject || '[[notifications:new_notification_from, ' + meta.config.title + ']]'),
+				subject: utils.stripHTMLTags(notification.subject || '[[notifications:new_notification]]'),
 				intro: utils.stripHTMLTags(notification.bodyShort),
-				body: utils.stripHTMLTags(notification.bodyLong || ''),
+				body: notification.bodyLong || '',
 				notification: notification,
 				showUnsubscribe: true,
 			}, next);
@@ -364,16 +358,16 @@ Notifications.rescind = function (nid, callback) {
 
 Notifications.markRead = function (nid, uid, callback) {
 	callback = callback || function () {};
-	if (!parseInt(uid, 10) || !nid) {
-		return callback();
+	if (parseInt(uid, 10) <= 0 || !nid) {
+		return setImmediate(callback);
 	}
 	Notifications.markReadMultiple([nid], uid, callback);
 };
 
 Notifications.markUnread = function (nid, uid, callback) {
 	callback = callback || function () {};
-	if (!parseInt(uid, 10) || !nid) {
-		return callback();
+	if (parseInt(uid, 10) <= 0 || !nid) {
+		return setImmediate(callback);
 	}
 	async.waterfall([
 		function (next) {
@@ -536,7 +530,7 @@ Notifications.merge = function (notifications, callback) {
 		// Each isolated mergeId may have multiple differentiators, so process each separately
 		differentiators = isolated.reduce(function (cur, next) {
 			differentiator = next.mergeId.split('|')[1] || 0;
-			if (cur.indexOf(differentiator) === -1) {
+			if (!cur.includes(differentiator)) {
 				cur.push(differentiator);
 			}
 
@@ -564,11 +558,9 @@ Notifications.merge = function (notifications, callback) {
 			case 'notifications:user_posted_to':
 			case 'notifications:user_flagged_post_in':
 			case 'notifications:user_flagged_user':
-				var usernames = set.map(function (notifObj) {
+				var usernames = _.uniq(set.map(function (notifObj) {
 					return notifObj && notifObj.user && notifObj.user.username;
-				}).filter(function (username, idx, array) {
-					return array.indexOf(username) === idx;
-				});
+				}));
 				var numUsers = usernames.length;
 
 				var title = utils.decodeHTMLEntities(notifications[modifyIndex].topicTitle || '');

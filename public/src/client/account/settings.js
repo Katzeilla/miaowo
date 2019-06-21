@@ -1,12 +1,13 @@
 'use strict';
 
 
-define('forum/account/settings', ['forum/account/header', 'components', 'sounds'], function (header, components, sounds) {
+define('forum/account/settings', ['forum/account/header', 'components', 'sounds', 'translator'], function (header, components, sounds, translator) {
 	var	AccountSettings = {};
 
+	// If page skin is changed but not saved, switch the skin back
 	$(window).on('action:ajaxify.start', function () {
 		if (ajaxify.data.template.name === 'account/settings' && $('#bootswatchSkin').val() !== config.bootswatchSkin) {
-			changePageSkin(config.bootswatchSkin);
+			app.reskin(config.bootswatchSkin);
 		}
 	});
 
@@ -30,7 +31,7 @@ define('forum/account/settings', ['forum/account/header', 'components', 'sounds'
 		});
 
 		$('#bootswatchSkin').on('change', function () {
-			changePageSkin($(this).val());
+			app.reskin($(this).val());
 		});
 
 		$('[data-property="homePageRoute"]').on('change', toggleCustomRoute);
@@ -38,7 +39,8 @@ define('forum/account/settings', ['forum/account/header', 'components', 'sounds'
 		$('.account').find('button[data-action="play"]').on('click', function (e) {
 			e.preventDefault();
 
-			var	soundName = $(this).parent().parent().find('select').val();
+			var	soundName = $(this).parent().parent().find('select')
+				.val();
 			sounds.playSound(soundName);
 		});
 
@@ -46,29 +48,6 @@ define('forum/account/settings', ['forum/account/header', 'components', 'sounds'
 
 		components.get('user/sessions').find('.timeago').timeago();
 	};
-
-	function changePageSkin(skinName) {
-		var css = $('#bootswatchCSS');
-		if (skinName === 'noskin' || (skinName === 'default' && config.defaultBootswatchSkin === 'noskin')) {
-			css.remove();
-		} else {
-			if (skinName === 'default') {
-				skinName = config.defaultBootswatchSkin;
-			}
-			var cssSource = '//maxcdn.bootstrapcdn.com/bootswatch/3.3.7/' + skinName + '/bootstrap.min.css';
-			if (css.length) {
-				css.attr('href', cssSource);
-			} else {
-				css = $('<link id="bootswatchCSS" href="' + cssSource + '" rel="stylesheet" media="screen">');
-				$('head').append(css);
-			}
-		}
-
-		var currentSkinClassName = $('body').attr('class').split(/\s+/).filter(function (className) {
-			return className.startsWith('skin-');
-		});
-		$('body').removeClass(currentSkinClassName.join(' ')).addClass('skin-' + skinName);
-	}
 
 	function loadSettings() {
 		var settings = {};
@@ -117,15 +96,12 @@ define('forum/account/settings', ['forum/account/header', 'components', 'sounds'
 			sounds.loadMap();
 
 			if (requireReload && parseInt(app.user.uid, 10) === parseInt(ajaxify.data.theirid, 10)) {
-				app.alert({
-					id: 'setting-change',
-					message: '[[user:settings-require-reload]]',
-					type: 'warning',
-					timeout: 5000,
-					clickfn: function () {
-						ajaxify.refresh();
-					},
+				translator.translate('[[language:dir]]', config.userLang, function (translated) {
+					var htmlEl = $('html');
+					htmlEl.attr('data-dir', translated);
+					htmlEl.css('direction', translated);
 				});
+				ajaxify.refresh();
 			}
 		});
 	}

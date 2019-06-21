@@ -170,7 +170,7 @@ describe('Build', function (done) {
 	it('should build client side styles', function (done) {
 		build.build(['client side styles'], function (err) {
 			assert.ifError(err);
-			var filename = path.join(__dirname, '../build/public/stylesheet.css');
+			var filename = path.join(__dirname, '../build/public/client.css');
 			assert(file.existsSync(filename));
 			assert(fs.readFileSync(filename).toString().startsWith('/*! normalize.css'));
 			done();
@@ -182,7 +182,8 @@ describe('Build', function (done) {
 			assert.ifError(err);
 			var filename = path.join(__dirname, '../build/public/admin.css');
 			assert(file.existsSync(filename));
-			assert(fs.readFileSync(filename).toString().startsWith('@charset "UTF-8";'));
+			var adminCSS = fs.readFileSync(filename).toString();
+			assert(adminCSS.startsWith('@charset "UTF-8";') || adminCSS.startsWith('@import url'));
 			done();
 		});
 	});

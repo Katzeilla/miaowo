@@ -139,6 +139,32 @@ describe('Sorted Set methods', function () {
 				done();
 			});
 		});
+
+		it('should return empty array if keys is empty array', function (done) {
+			db.getSortedSetRange([], 0, -1, function (err, data) {
+				assert.ifError(err);
+				assert.deepStrictEqual(data, []);
+				done();
+			});
+		});
+
+		it('should return duplicates if two sets have same elements', function (done) {
+			async.waterfall([
+				function (next) {
+					db.sortedSetAdd('dupezset1', [1, 2], ['value 1', 'value 2'], next);
+				},
+				function (next) {
+					db.sortedSetAdd('dupezset2', [2, 3], ['value 2', 'value 3'], next);
+				},
+				function (next) {
+					db.getSortedSetRange(['dupezset1', 'dupezset2'], 0, -1, next);
+				},
+				function (data, next) {
+					assert.deepStrictEqual(data, ['value 1', 'value 2', 'value 2', 'value 3']);
+					next();
+				},
+			], done);
+		});
 	});
 
 	describe('getSortedSetRevRange()', function () {
@@ -199,6 +225,33 @@ describe('Sorted Set methods', function () {
 				assert(Array.isArray(values));
 				assert.equal(values.length, 0);
 				done();
+			});
+		});
+
+		it('should return empty array if count is 0', function (done) {
+			db.getSortedSetRevRangeByScore('sortedSetTest1', 0, 0, '+inf', '-inf', function (err, values) {
+				assert.ifError(err);
+				assert.deepEqual(values, []);
+				done();
+			});
+		});
+
+		it('should return elements from 1 to end', function (done) {
+			db.getSortedSetRevRangeByScore('sortedSetTest1', 1, -1, '+inf', '-inf', function (err, values) {
+				assert.ifError(err);
+				assert.deepEqual(values, ['value2', 'value1']);
+				done();
+			});
+		});
+
+		it('should return elements from 3 to last', function (done) {
+			db.sortedSetAdd('partialZset', [1, 2, 3, 4, 5], ['value1', 'value2', 'value3', 'value4', 'value5'], function (err) {
+				assert.ifError(err);
+				db.getSortedSetRangeByScore('partialZset', 3, 10, '-inf', '+inf', function (err, data) {
+					assert.ifError(err);
+					assert.deepStrictEqual(data, ['value4', 'value5']);
+					done();
+				});
 			});
 		});
 	});
@@ -291,6 +344,24 @@ describe('Sorted Set methods', function () {
 				assert.equal(err, null);
 				assert.equal(arguments.length, 2);
 				assert.deepEqual(counts, [3, 2, 0]);
+				done();
+			});
+		});
+
+		it('should return empty array if keys is falsy', function (done) {
+			db.sortedSetsCard(undefined, function (err, counts) {
+				assert.ifError(err);
+				assert.equal(arguments.length, 2);
+				assert.deepEqual(counts, []);
+				done();
+			});
+		});
+
+		it('should return empty array if keys is empty array', function (done) {
+			db.sortedSetsCard([], function (err, counts) {
+				assert.ifError(err);
+				assert.equal(arguments.length, 2);
+				assert.deepEqual(counts, []);
 				done();
 			});
 		});
@@ -428,7 +499,7 @@ describe('Sorted Set methods', function () {
 			db.sortedSetScore('sortedSetTest1', 'value2', function (err, score) {
 				assert.equal(err, null);
 				assert.equal(arguments.length, 2);
-				assert.equal(score, 1.2);
+				assert.strictEqual(score, 1.2);
 				done();
 			});
 		});
@@ -468,6 +539,15 @@ describe('Sorted Set methods', function () {
 				done();
 			});
 		});
+
+		it('should return empty array if keys is empty array', function (done) {
+			db.sortedSetsScore([], 'value1', function (err, scores) {
+				assert.equal(err, null);
+				assert.equal(arguments.length, 2);
+				assert.deepEqual(scores, []);
+				done();
+			});
+		});
 	});
 
 	describe('sortedSetScores()', function () {
@@ -478,25 +558,43 @@ describe('Sorted Set methods', function () {
 		it('should return 0 if score is 0', function (done) {
 			db.sortedSetScores('zeroScore', ['value1'], function (err, scores) {
 				assert.ifError(err);
-				assert.equal(0, scores[0]);
+				assert.strictEqual(0, scores[0]);
 				done();
 			});
 		});
 
 		it('should return the scores of value in sorted sets', function (done) {
 			db.sortedSetScores('sortedSetTest1', ['value2', 'value1', 'doesnotexist'], function (err, scores) {
-				assert.equal(err, null);
+				assert.ifError(err);
 				assert.equal(arguments.length, 2);
-				assert.deepEqual(scores, [1.2, 1.1, null]);
+				assert.deepStrictEqual(scores, [1.2, 1.1, null]);
 				done();
 			});
 		});
 
 		it('should return scores even if some values are undefined', function (done) {
 			db.sortedSetScores('sortedSetTest1', ['value2', undefined, 'doesnotexist'], function (err, scores) {
-				assert.equal(err, null);
+				assert.ifError(err);
 				assert.equal(arguments.length, 2);
-				assert.deepEqual(scores, [1.2, null, null]);
+				assert.deepStrictEqual(scores, [1.2, null, null]);
+				done();
+			});
+		});
+
+		it('should return empty array if values is an empty array', function (done) {
+			db.sortedSetScores('sortedSetTest1', [], function (err, scores) {
+				assert.ifError(err);
+				assert.equal(arguments.length, 2);
+				assert.deepStrictEqual(scores, []);
+				done();
+			});
+		});
+
+		it('should return scores properly', function (done) {
+			db.sortedSetsScore(['zeroScore', 'sortedSetTest1', 'doesnotexist'], 'value1', function (err, scores) {
+				assert.ifError(err);
+				assert.equal(arguments.length, 2);
+				assert.deepStrictEqual(scores, [0, 1.1, null]);
 				done();
 			});
 		});
@@ -560,6 +658,15 @@ describe('Sorted Set methods', function () {
 				assert.equal(err, null);
 				assert.equal(arguments.length, 2);
 				assert.deepEqual(isMembers, [false, true, false]);
+				done();
+			});
+		});
+
+		it('should return empty array if keys is empty array', function (done) {
+			db.isMemberOfSortedSets([], 'value2', function (err, isMembers) {
+				assert.ifError(err);
+				assert.equal(arguments.length, 2);
+				assert.deepEqual(isMembers, []);
 				done();
 			});
 		});
@@ -738,7 +845,7 @@ describe('Sorted Set methods', function () {
 				assert.equal(arguments.length, 1);
 				db.sortedSetsScore(['sorted4', 'sorted5'], 'value1', function (err, scores) {
 					assert.equal(err, null);
-					assert.deepEqual(scores, [null, null]);
+					assert.deepStrictEqual(scores, [null, null]);
 					done();
 				});
 			});

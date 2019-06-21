@@ -88,7 +88,7 @@
     "invalid-image-type": "Ongeldig bestandstype afbeelding. Deze afbeelding is van een bestandstype dat niet ondersteund wordt. Toegestane bestandstypes voor afbeeldingsbestanden zijn: %1",
     "invalid-image-extension": "Ongeldig bestandstype afbeelding",
     "invalid-file-type": "Dit bestandstype wordt niet ondersteund. Toegestane bestandstypen zijn: %1",
-    "invalid-image-dimensions": "Image dimensions are too big",
+    "invalid-image-dimensions": "Dimensies van de afbeelding zijn te groot",
     "group-name-too-short": "De groepsnaam is te kort",
     "group-name-too-long": "Groepsnaam te lang",
     "group-already-exists": "Een groep met deze naam bestaat al",
@@ -120,7 +120,7 @@
     "chat-edit-duration-expired": "Het is slechts toegestaan om binnen %1 seconde(n) na plaatsen van het chat bericht, deze te bewerken.",
     "chat-delete-duration-expired": "Het is slechts toegestaan om binnen %1 seconde(n) na plaatsen van het chat bericht, deze te verwijderen.",
     "chat-deleted-already": "Dit chat bericht is al verwijderd.",
-    "chat-restored'already": "Dit chat bericht is al hersteld.",
+    "chat-restored-already": "Dit chat bericht is al hersteld.",
     "already-voting-for-this-post": "Je hebt al gestemd voor deze post.",
     "reputation-system-disabled": "Reputatie systeem is uitgeschakeld.",
     "downvoting-disabled": "Negatief stemmen is uitgeschakeld",
@@ -153,5 +153,8 @@
     "cant-move-to-same-topic": "Een bericht kan niet naar hetzelfde onderwerp worden verplaatst!",
     "cannot-block-self": "Je kan jezelf niet blokkeren!",
     "cannot-block-privileged": "Je kan geen administrators of global moderators blokkeren",
+    "cannot-block-guest": "Gasten kunnen geen andere gebruikers blokkeren",
+    "already-blocked": "Deze gebruiker is al geblokkeerd",
+    "already-unblocked": "Deze gebruiker is al gedeblokkeerd",
     "no-connection": "Er lijkt een probleem te zijn met je internetverbinding"
 }

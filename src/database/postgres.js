@@ -7,7 +7,7 @@ var session = require('express-session');
 var _ = require('lodash');
 var semver = require('semver');
 var dbNamespace = require('continuation-local-storage').createNamespace('postgres');
-var db;
+
 
 var postgresModule = module.exports;
 
@@ -44,27 +44,30 @@ postgresModule.questions = [
 postgresModule.helpers = postgresModule.helpers || {};
 postgresModule.helpers.postgres = require('./postgres/helpers');
 
-postgresModule.getConnectionOptions = function () {
+postgresModule.getConnectionOptions = function (postgres) {
+	postgres = postgres || nconf.get('postgres');
 	// Sensible defaults for PostgreSQL, if not set
-	if (!nconf.get('postgres:host')) {
-		nconf.set('postgres:host', '127.0.0.1');
+	if (!postgres.host) {
+		postgres.host = '127.0.0.1';
 	}
-	if (!nconf.get('postgres:port')) {
-		nconf.set('postgres:port', 5432);
+	if (!postgres.port) {
+		postgres.port = 5432;
 	}
-	if (!nconf.get('postgres:database')) {
-		nconf.set('postgres:database', 'nodebb');
+	const dbName = postgres.database;
+	if (dbName === undefined || dbName === '') {
+		winston.warn('You have no database name, using "nodebb"');
+		postgres.database = 'nodebb';
 	}
 
 	var connOptions = {
-		host: nconf.get('postgres:host'),
-		port: nconf.get('postgres:port'),
-		user: nconf.get('postgres:username'),
-		password: nconf.get('postgres:password'),
-		database: nconf.get('postgres:database'),
+		host: postgres.host,
+		port: postgres.port,
+		user: postgres.username,
+		password: postgres.password,
+		database: postgres.database,
 	};
 
-	return _.merge(connOptions, nconf.get('postgres:options') || {});
+	return _.merge(connOptions, postgres.options || {});
 };
 
 postgresModule.init = function (callback) {
@@ -74,7 +77,7 @@ postgresModule.init = function (callback) {
 
 	var connOptions = postgresModule.getConnectionOptions();
 
-	db = new Pool(connOptions);
+	const db = new Pool(connOptions);
 
 	db.on('connect', function (client) {
 		var realQuery = client.query;
@@ -127,6 +130,29 @@ postgresModule.init = function (callback) {
 
 			callback();
 		});
+	});
+};
+
+postgresModule.connect = function (options, callback) {
+	var Pool = require('pg').Pool;
+
+	var connOptions = postgresModule.getConnectionOptions(options);
+
+	const db = new Pool(connOptions);
+
+	db.on('connect', function (client) {
+		var realQuery = client.query;
+		client.query = function () {
+			var args = Array.prototype.slice.call(arguments, 0);
+			if (dbNamespace.active && typeof args[args.length - 1] === 'function') {
+				args[args.length - 1] = dbNamespace.bind(args[args.length - 1]);
+			}
+			return realQuery.apply(client, args);
+		};
+	});
+
+	db.connect(function (err) {
+		callback(err, db);
 	});
 };
 
@@ -345,41 +371,27 @@ SELECT "_key", "type"
 	});
 }
 
-postgresModule.initSessionStore = function (callback) {
+postgresModule.createSessionStore = function (options, callback) {
 	var meta = require('../meta');
-	var sessionStore;
 
-	var ttl = meta.getSessionTTLSeconds();
-
-	if (nconf.get('redis')) {
-		sessionStore = require('connect-redis')(session);
-		var rdb = require('./redis');
-		rdb.client = rdb.connect();
-
-		postgresModule.sessionStore = new sessionStore({
-			client: rdb.client,
-			ttl: ttl,
-		});
-
-		return callback();
-	}
-
-	function done() {
-		sessionStore = require('connect-pg-simple')(session);
-		postgresModule.sessionStore = new sessionStore({
+	function done(db) {
+		const sessionStore = require('connect-pg-simple')(session);
+		const store = new sessionStore({
 			pool: db,
-			ttl: ttl,
+			ttl: meta.getSessionTTLSeconds(),
 			pruneSessionInterval: nconf.get('isPrimary') === 'true' ? 60 : false,
 		});
-
-		callback();
+		callback(null, store);
 	}
 
-	if (nconf.get('isPrimary') !== 'true') {
-		return done();
-	}
-
-	db.query(`
+	postgresModule.connect(options, function (err, db) {
+		if (err) {
+			return callback(err);
+		}
+		if (nconf.get('isPrimary') !== 'true') {
+			return done(db);
+		}
+		db.query(`
 CREATE TABLE IF NOT EXISTS "session" (
 	"sid" CHAR(32) NOT NULL
 		COLLATE "C"
@@ -393,11 +405,12 @@ CREATE INDEX IF NOT EXISTS "session_expire_idx" ON "session"("expire");
 ALTER TABLE "session"
 	ALTER "sid" SET STORAGE MAIN,
 	CLUSTER ON "session_expire_idx";`, function (err) {
-		if (err) {
-			return callback(err);
-		}
+			if (err) {
+				return callback(err);
+			}
 
-		done();
+			done(db);
+		});
 	});
 };
 
@@ -437,24 +450,31 @@ postgresModule.checkCompatibilityVersion = function (version, callback) {
 };
 
 postgresModule.info = function (db, callback) {
-	if (!db) {
-		return callback();
-	}
+	async.waterfall([
+		function (next) {
+			if (db) {
+				setImmediate(next, null, db);
+			} else {
+				postgresModule.connect(nconf.get('postgres'), next);
+			}
+		},
+		function (db, next) {
+			postgresModule.pool = postgresModule.pool || db;
 
-	db.query(`
-SELECT true "postgres",
-       current_setting('server_version') "version",
-       EXTRACT(EPOCH FROM NOW() - pg_postmaster_start_time()) * 1000 "uptime"`, function (err, res) {
-		if (err) {
-			return callback(err);
-		}
-		callback(null, res.rows[0]);
-	});
+			db.query(`
+			SELECT true "postgres",
+				   current_setting('server_version') "version",
+				   EXTRACT(EPOCH FROM NOW() - pg_postmaster_start_time()) * 1000 "uptime"`, next);
+		},
+		function (res, next) {
+			next(null, res.rows[0]);
+		},
+	], callback);
 };
 
 postgresModule.close = function (callback) {
 	callback = callback || function () {};
-	db.end(callback);
+	postgresModule.pool.end(callback);
 };
 
 postgresModule.socketAdapter = function () {

@@ -1,11 +1,14 @@
 'use strict';
 
 var async = require('async');
+const _ = require('lodash');
 
 var db = require('../database');
 var user = require('../user');
 var meta = require('../meta');
+var groups = require('../groups');
 var topics = require('../topics');
+var categories = require('../categories');
 var notifications = require('../notifications');
 var privileges = require('../privileges');
 var plugins = require('../plugins');
@@ -15,10 +18,10 @@ module.exports = function (Posts) {
 	Posts.shouldQueue = function (uid, data, callback) {
 		async.waterfall([
 			function (next) {
-				user.getUserFields(uid, ['reputation', 'postcount'], next);
+				user.getUserFields(uid, ['uid', 'reputation', 'postcount'], next);
 			},
 			function (userData, next) {
-				var shouldQueue = parseInt(meta.config.postQueue, 10) === 1 && (!parseInt(uid, 10) || (parseInt(userData.reputation, 10) <= 0 && parseInt(userData.postcount, 10) <= 0));
+				const shouldQueue = meta.config.postQueue && (!userData.uid || userData.reputation < 0 || userData.postcount <= 0);
 				plugins.fireHook('filter:post.shouldQueue', {
 					shouldQueue: shouldQueue,
 					uid: uid,
@@ -30,6 +33,44 @@ module.exports = function (Posts) {
 			},
 		], callback);
 	};
+
+	function removeQueueNotification(id, callback) {
+		async.waterfall([
+			function (next) {
+				notifications.rescind('post-queue-' + id, next);
+			},
+			function (next) {
+				getParsedObject(id, next);
+			},
+			function (data, next) {
+				if (!data) {
+					return callback();
+				}
+				getCid(data.type, data, next);
+			},
+			function (cid, next) {
+				getNotificationUids(cid, next);
+			},
+			function (uids, next) {
+				uids.forEach(uid => user.notifications.pushCount(uid));
+				next();
+			},
+		], callback);
+	}
+
+	function getNotificationUids(cid, callback) {
+		async.waterfall([
+			function (next) {
+				async.parallel([
+					async.apply(groups.getMembersOfGroups, ['administrators', 'Global Moderators']),
+					async.apply(categories.getModeratorUids, [cid]),
+				], next);
+			},
+			function (results, next) {
+				next(null, _.uniq(_.flattenDeep(results)));
+			},
+		], callback);
+	}
 
 	Posts.addToQueue = function (data, callback) {
 		var type = data.title ? 'topic' : 'reply';
@@ -64,14 +105,21 @@ module.exports = function (Posts) {
 							path: '/post-queue',
 						}, next);
 					},
-					cid: function (next) {
-						getCid(type, data, next);
+					uids: function (next) {
+						async.waterfall([
+							function (next) {
+								getCid(type, data, next);
+							},
+							function (cid, next) {
+								getNotificationUids(cid, next);
+							},
+						], next);
 					},
 				}, next);
 			},
 			function (results, next) {
 				if (results.notification) {
-					notifications.pushGroups(results.notification, ['administrators', 'Global Moderators', 'cid:' + results.cid + ':privileges:moderate'], next);
+					notifications.push(results.notification, results.uids, next);
 				} else {
 					next();
 				}
@@ -128,13 +176,13 @@ module.exports = function (Posts) {
 	Posts.removeFromQueue = function (id, callback) {
 		async.waterfall([
 			function (next) {
+				removeQueueNotification(id, next);
+			},
+			function (next) {
 				db.sortedSetRemove('post:queue', id, next);
 			},
 			function (next) {
 				db.delete('post:queue:' + id, next);
-			},
-			function (next) {
-				notifications.rescind('post-queue-' + id, next);
 			},
 		], callback);
 	};
@@ -199,8 +247,8 @@ module.exports = function (Posts) {
 			function (postData, next) {
 				var result = {
 					posts: [postData],
-					'reputation:disabled': parseInt(meta.config['reputation:disabled'], 10) === 1,
-					'downvote:disabled': parseInt(meta.config['downvote:disabled'], 10) === 1,
+					'reputation:disabled': !!meta.config['reputation:disabled'],
+					'downvote:disabled': !!meta.config['downvote:disabled'],
 				};
 				socketHelpers.notifyNew(data.uid, 'newPost', result);
 				next();

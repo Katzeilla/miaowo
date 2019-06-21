@@ -7,9 +7,9 @@ var validator = require('validator');
 var meta = require('../meta');
 var plugins = require('../plugins');
 
-exports.handle404 = function (req, res) {
+exports.handle404 = function handle404(req, res) {
 	var relativePath = nconf.get('relative_path');
-	var isClientScript = new RegExp('^' + relativePath + '\\/assets\\/src\\/.+\\.js');
+	var isClientScript = new RegExp('^' + relativePath + '\\/assets\\/src\\/.+\\.js(\\?v=\\w+)?$');
 
 	if (plugins.hasListeners('action:meta.override404')) {
 		return plugins.fireHook('action:meta.override404', {
@@ -21,7 +21,7 @@ exports.handle404 = function (req, res) {
 
 	if (isClientScript.test(req.url)) {
 		res.type('text/javascript').status(200).send('');
-	} else if (req.path.startsWith(relativePath + '/assets/uploads') || (req.get('accept') && req.get('accept').indexOf('text/html') === -1) || req.path === '/favicon.ico') {
+	} else if (req.path.startsWith(relativePath + '/assets/uploads') || (req.get('accept') && !req.get('accept').includes('text/html')) || req.path === '/favicon.ico') {
 		meta.errors.log404(req.path || '');
 		res.sendStatus(404);
 	} else if (req.accepts('html')) {
