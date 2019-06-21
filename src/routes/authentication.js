@@ -100,19 +100,32 @@ Auth.reloadRoutes = function (router, callback) {
 							return helpers.redirect(res, strategy.failureUrl !== undefined ? strategy.failureUrl : '/login');
 						}
 
-						req.login(user, function (err) {
-							if (err) {
-								return next(err);
-							}
-
-							helpers.redirect(res, strategy.successUrl !== undefined ? strategy.successUrl : '/');
-						});
+						res.locals.user = user;
+						res.locals.strategy = strategy;
+						next();
 					})(req, res, next);
+				},
+				Auth.middleware.validateAuth,
+				(req, res, next) => {
+					async.waterfall([
+						async.apply(req.login.bind(req), res.locals.user),
+						async.apply(controllers.authentication.onSuccessfulLogin, req, req.uid),
+					], function (err) {
+						if (err) {
+							return next(err);
+						}
+
+						helpers.redirect(res, strategy.successUrl !== undefined ? strategy.successUrl : '/');
+					});
 				});
 			});
 
-			router.post('/register', Auth.middleware.applyCSRF, Auth.middleware.applyBlacklist, controllers.authentication.register);
-			router.post('/register/complete', Auth.middleware.applyCSRF, Auth.middleware.applyBlacklist, controllers.authentication.registerComplete);
+			var multipart = require('connect-multiparty');
+			var multipartMiddleware = multipart();
+			var middlewares = [multipartMiddleware, Auth.middleware.applyCSRF, Auth.middleware.applyBlacklist];
+
+			router.post('/register', middlewares, controllers.authentication.register);
+			router.post('/register/complete', middlewares, controllers.authentication.registerComplete);
 			router.post('/register/abort', controllers.authentication.registerAbort);
 			router.post('/login', Auth.middleware.applyCSRF, Auth.middleware.applyBlacklist, controllers.authentication.login);
 			router.post('/logout', Auth.middleware.applyCSRF, controllers.authentication.logout);

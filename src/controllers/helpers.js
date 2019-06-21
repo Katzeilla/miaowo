@@ -117,7 +117,7 @@ helpers.notAllowed = function (req, res, error) {
 		if (err) {
 			return winston.error(err);
 		}
-		if (req.loggedIn) {
+		if (req.loggedIn || req.uid === -1) {
 			if (res.locals.isAPI) {
 				res.status(403).json({
 					path: req.path.replace(/^\/api/, ''),
@@ -136,10 +136,10 @@ helpers.notAllowed = function (req, res, error) {
 				});
 			}
 		} else if (res.locals.isAPI) {
-			req.session.returnTo = nconf.get('relative_path') + req.url.replace(/^\/api/, '');
+			req.session.returnTo = req.url.replace(/^\/api/, '');
 			res.status(401).json('not-authorized');
 		} else {
-			req.session.returnTo = nconf.get('relative_path') + req.url;
+			req.session.returnTo = req.url;
 			res.redirect(nconf.get('relative_path') + '/login');
 		}
 	});

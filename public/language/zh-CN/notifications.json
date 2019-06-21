@@ -65,8 +65,12 @@
     "notificationType_follow": "当有人关注您时",
     "notificationType_new-chat": "当您收到聊天消息时",
     "notificationType_group-invite": "当您收到群组邀请时",
+<<<<<<< HEAD
     "notificationType_group-request-membership": "When someone requests to join a group you own",
 >>>>>>> upstream/v1.11.x
+=======
+    "notificationType_group-request-membership": "当有人请求加入您拥有的用户组时",
+>>>>>>> upstream/v1.12.x
     "notificationType_new-register": "当有人被添加到申请队列时",
     "notificationType_post-queue": "当有新帖子等待审核时",
     "notificationType_new-post-flag": "当有新的帖子举报时",
